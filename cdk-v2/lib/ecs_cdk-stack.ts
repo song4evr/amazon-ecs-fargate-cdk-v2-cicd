@@ -43,6 +43,11 @@ export class EcsCdkStack extends cdk.Stack {
           name: 'public',
           subnetType: ec2.SubnetType.PUBLIC,
         },
+        {
+          cidrMask: 24,
+          name: 'private',
+          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        },
         // Add more subnet configurations as needed for private and isolated subnets
       ],
       natGateways: 1,
@@ -90,7 +95,7 @@ export class EcsCdkStack extends cdk.Stack {
 
     taskDef.addToExecutionRolePolicy(executionRolePolicy);
 
-    const baseImage = 'public.ecr.aws/amazonlinux/amazonlinux:2022'
+    const baseImage = 'public.ecr.aws/ecs-sample-image/amazon-ecs-sample:latest'
     const container = taskDef.addContainer('flask-app', {
       image: ecs.ContainerImage.fromRegistry(baseImage),
       memoryLimitMiB: 256,
@@ -99,13 +104,14 @@ export class EcsCdkStack extends cdk.Stack {
     });
 
     container.addPortMappings({
-      containerPort: 5000,
+      containerPort: 80,
       protocol: ecs.Protocol.TCP
     });
 
     const fargateService = new ecs_patterns.ApplicationLoadBalancedFargateService(this, "ecs-service", {
       cluster: cluster,
       taskDefinition: taskDef,
+      taskSubnets: {subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS},
       publicLoadBalancer: true,
       desiredCount: 1,
       listenerPort: 80
